@@ -22,7 +22,7 @@ samtools view in.bam chr_name | ksnp -k <k-mer size> -v <VCF file> -o <output fi
   ## The output file includes all of the variants in input VCF file with phased information.
   
 ```
-Contact
+## Contact
 ```
 zhouqian_solab@163.com
 ```
