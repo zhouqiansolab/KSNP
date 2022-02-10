@@ -14,7 +14,6 @@ mkdir build; cd build
 cmake ..; make
 ```
 ## Usage
-
 ```
 samtools view in.bam chr_name | ksnp -k <k-mer size> -v <VCF file> -o <output file>
   ## K-mer size supports INT value from 2 to 10 (default value is 2)
@@ -22,4 +21,8 @@ samtools view in.bam chr_name | ksnp -k <k-mer size> -v <VCF file> -o <output fi
   ## The VCF file should contain SNP positions on one chromosome. Please split the VCF file into small files according to the chr_name. The VCF file can be in be in compressed gz format or decompressed format.
   ## The output file includes all of the variants in input VCF file with phased information.
   
+```
+Contact
+```
+zhouqian_solab@163.com
 ```
