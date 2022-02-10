@@ -7,6 +7,7 @@
 - gcc >= 6.4
 - zlib
 - make
+- samtools
 
 ```
 git clone https://github.com/zhouqiansolab/KSNP-k-mer-based-haplotype-assembly.git
