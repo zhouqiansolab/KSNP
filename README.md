@@ -5,12 +5,12 @@
 **Dependencies**
 - cmake >= 3.10
 - gcc >= 6.4
-- zlib
-- make
-- samtools
+- zlib >= 1.2
+- samtools >= 1.9
 
 ```
 git clone https://github.com/zhouqiansolab/KSNP-k-mer-based-haplotype-assembly.git
+cd KSNP-k-mer-based-haplotype-assembly;
 mkdir build; cd build
 cmake ..; make
 ```
