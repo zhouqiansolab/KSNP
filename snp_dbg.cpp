@@ -11,8 +11,6 @@
 
 extern std::string global_chrom;
 
-extern std::vector<SNP> global_snps; // For debug only
-
 void SNP_DBG::construct_graph(std::vector<SNP> &snps) const {
 	const int SAM_BUF_SIZE = 24 * 1024 * 1024;
 	char *buf = new char[SAM_BUF_SIZE];
@@ -33,23 +31,23 @@ void SNP_DBG::construct_graph(std::vector<SNP> &snps) const {
 		int read_len = 0, ref_len = 0;
 		for (int i = 0; i < cigar.n; i++) {
 			const auto &p = std::make_pair(cigar.num[i], cigar.op[i]);
-			if (p.second != 'D') read_len += p.first;
-			if (p.second != 'I' && p.second != 'S') ref_len += p.first;
+			if (p.second != 'D' && p.second != 'H') read_len += p.first;
+			if (p.second != 'I' && p.second != 'S' && p.second != 'H') ref_len += p.first;
 		}
 
 		int cid = 0, que_pointer = 0, ref_pointer = sam.ref_start;
-		int que_tag = 0;
 		uint32_t node_kmer = 0, NODE_MASK = (1<<K) - 1;
 		uint32_t edge_kmer = 0, EDGE_MARK = (1<<(K+1)) - 1;
 		int count = 0;
 		for (int i = bs; i < snps.size(); i++) {
 			auto &s = snps[i];
-			if (s.pos > sam.ref_start + ref_len) break;
+			if (s.pos >= sam.ref_start + ref_len) break;
 			// Find the cigar interval overlapping the SNP.
 			// The cigar intervals are consecutive.
 			// For example, 12D2X193I= has cigar intervals [0,12), [12, 14), [14, 33), [33, 33).
 			while (cid < cigar.n) {
 				const auto &p = std::make_pair(cigar.num[cid], cigar.op[cid]);
+				if (p.second == 'H') { cid++; continue; }
 				if (p.second == 'I' || p.second == 'S') {
 					que_pointer += p.first;
 					cid++;
@@ -59,26 +57,13 @@ void SNP_DBG::construct_graph(std::vector<SNP> &snps) const {
 				if (ref_pointer + p.first > s.pos) break; // The cigar interval overlapping the SNP
 				ref_pointer += p.first;
 				if (p.second != 'D') que_pointer += p.first;
-				if ((sam.flag & 0x10) == 0) {
-					if (p.second == '=' || p.second == 'X') que_tag = que_pointer + 1;
-					else if (p.second == 'D') que_tag = que_pointer;
-				} else {
-					if (p.second == '=' || p.second == 'X') que_tag = read_len - 1 - que_pointer;
-					else if (p.second == 'D') que_tag = que_pointer;
-				}
 				cid++;
 			}
-			char que_base;
-			// FIXME: I think it is wrong, but I have to respect the original program
-			if (s.pos == sam.ref_start + ref_len) {
-				if (que_tag < read_len) que_base = que_tag == -1 ?sam.bases[read_len-1] :sam.bases[que_tag];
-				else que_base = '-';
-			} else {
-				assert(cid < cigar.n);
-				const auto &p = std::make_pair(cigar.num[cid], cigar.op[cid]);
-				int que_pos = p.second == 'D' ?que_pointer - 1 :que_pointer + s.pos - ref_pointer;
-				que_base = p.second == 'D' ?'-' :sam.bases[que_pos];
-			}
+
+			assert(cid < cigar.n);
+			const auto &p = std::make_pair(cigar.num[cid], cigar.op[cid]);
+			int que_pos = p.second == 'D' ?que_pointer - 1 :que_pointer + s.pos - ref_pointer;
+			char que_base = p.second == 'D' ?'-' :sam.bases[que_pos];
 
 			if (que_base == '-' || (que_base != s.ref && que_base != s.alt)) {
 				node_kmer = 0; edge_kmer = 0; count = 0;
@@ -185,7 +170,9 @@ int parse_label(const std::string &a) {
 	return -1;
 }
 
-void SNP_DBG::load_graph_from_stdin(const std::vector<SNP> &snps) const {
+void SNP_DBG::input_graph_from_file(const char *fn, const std::vector<SNP> &snps) const {
+	freopen(fn, "r", stdin);
+	memset(weight, 0, snp_n * (1<<(K+1)) * sizeof(int));
 	std::string line;
 	int cnt = 0;
 	while (std::getline(std::cin, line)) {
@@ -231,6 +218,7 @@ void SNP_DBG::load_graph_from_stdin(const std::vector<SNP> &snps) const {
 		cnt++;
 	}
 	std::cerr << "Load " << cnt << " edges from stdin" << std::endl;
+	fclose(stdin);
 }
 
 SNP_Block SNP_DBG::traversal_block(int p, int u) {
@@ -507,20 +495,29 @@ void SNP_DBG::remove_tip() {
 }
 
 void SNP_DBG::remove_bubble() {
-	int node_intv = (1 << K), edge_intv = (1 << (K+1)); 
+	int node_intv = (1 << K), edge_intv = (1 << (K+1));
+	int equal_n = 0;
 	for (int i = 0; i < snp_n-1; i++) {
 		for (int node_u = 0; node_u < node_intv/2; node_u++) { // Only enumerating a half of nodes
 			int e0 = weight[(i+1) * edge_intv + (node_u << 1 | 0)];
 			int e1 = weight[(i+1) * edge_intv + (node_u << 1 | 1)];
 			if (e0 == 0 || e1 == 0) continue;
-			// Break bubbles in a relatively brute way
 			int node_r = (~node_u) & (node_intv-1);
-			if (e0 >= e1) {
+			if (e0 > e1) {
+				weight[(i+1) * edge_intv + (node_u << 1 | 1)] = 0;
+				weight[(i+1) * edge_intv + (node_r << 1 | 0)] = 0;
+			} else if (e0 < e1) {
 				weight[(i+1) * edge_intv + (node_u << 1 | 0)] = 0;
 				weight[(i+1) * edge_intv + (node_r << 1 | 1)] = 0;
 			} else {
-				weight[(i+1) * edge_intv + (node_u << 1 | 1)] = 0;
-				weight[(i+1) * edge_intv + (node_r << 1 | 0)] = 0;
+				equal_n++;
+				if (equal_n % 2 == 1) {
+					weight[(i+1) * edge_intv + (node_u << 1 | 1)] = 0;
+					weight[(i+1) * edge_intv + (node_r << 1 | 0)] = 0;
+				} else {
+					weight[(i+1) * edge_intv + (node_u << 1 | 0)] = 0;
+					weight[(i+1) * edge_intv + (node_r << 1 | 1)] = 0;
+				}
 			}
 		}
 	}
@@ -555,8 +552,6 @@ void SNP_DBG::remove_tip_again() {
 			}
 
 			int who_is_bad;
-			int deg0 = in_degree(i - p0, v0); // assert(deg0 == 0);
-			int deg1 = in_degree(i - p1, v1); // assert(deg1 == 0); // I found the case whose path length > 1000
 			if (p0 > p1) who_is_bad = 1;
 			else if (p0 < p1) who_is_bad = 0;
 			else {
@@ -565,8 +560,7 @@ void SNP_DBG::remove_tip_again() {
 				if (w0 > w1) who_is_bad = 1;
 				else if (w0 < w1) who_is_bad = 0;
 				else {
-					char base0 = global_snps[i-1].ref, base1 = global_snps[i-1].alt;
-					if (base0 > base1) who_is_bad = 1;
+					if (i % 2 == 1) who_is_bad = 1;
 					else who_is_bad = 0;
 				}
 			}

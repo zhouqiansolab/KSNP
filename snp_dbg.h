@@ -35,7 +35,7 @@ struct SNP_DBG {
 
 	void construct_graph(std::vector<SNP> &snps) const;
 
-	void load_graph_from_stdin(const std::vector<SNP> &snps) const;
+	void input_graph_from_file(const char *fn, const std::vector<SNP> &snps) const;
 
 	inline bool filter_edge(int heaviest, int edge_weight) ;
 

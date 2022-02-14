@@ -60,7 +60,7 @@ struct Phased_Result {
 
 std::vector<SNP_Block> remove_overlap(std::vector<SNP_Block> &blocks);
 
-std::vector<SNP_Block> load_blocks_from_stdin();
+std::vector<SNP_Block> input_blocks_from_file(const char *fn);
 
 void view_merged_blocks();
 

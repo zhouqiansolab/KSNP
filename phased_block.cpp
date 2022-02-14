@@ -67,7 +67,8 @@ std::vector<SNP_Block> remove_overlap(std::vector<SNP_Block> &blocks) {
 extern std::string global_chrom;
 extern std::vector<SNP> global_snps;
 
-std::vector<SNP_Block> load_blocks_from_stdin() {
+std::vector<SNP_Block> input_blocks_from_file(const char *fn) {
+	freopen(fn, "r", stdin);
 	std::vector<SNP_Block> ret;
 	while (true) {
 		std::string block_id; std::cin >> block_id;
@@ -101,6 +102,7 @@ std::vector<SNP_Block> load_blocks_from_stdin() {
 		std::cin >> block_id >> chrom >> pos_list >> base_list; // Skip the mate line
 	}
 	std::cerr << "Input " << ret.size() << " blocks from stdin" << std::endl;
+	fclose(stdin);
 	return ret;
 }
 

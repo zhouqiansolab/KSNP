@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <sys/time.h>
 #include <getopt.h>
-#include <cassert>
 
 #include "snp_dbg.h"
 
@@ -23,22 +22,18 @@ double realtime(){
 	return tp.tv_sec + tp.tv_usec * 1e-6;
 }
 
-std::vector<SNP> global_snps;
+std::vector<SNP> global_snps; // For debug only
 
 int main(int argc, char *argv[]) {
 	if (argc == 1) return usage();
 	double time_s = realtime();
 	int c, K = 2;
-	const char *vcf_fn = nullptr, *resolution_fn, *bam_fn, *output_fn = nullptr;
-	while ((c = getopt(argc, argv, "k:v:g:b:o:")) >= 0) {
+	const char *vcf_fn = nullptr, *output_fn = nullptr;
+	while ((c = getopt(argc, argv, "k:v:o:")) >= 0) {
 		if (c == 'k') {
 			K = atoi(optarg);
 		} else if (c == 'v') {
 			vcf_fn = optarg;
-		} else if (c == 'g') {
-			resolution_fn = optarg;
-		} else if (c == 'b') {
-			bam_fn = optarg;
 		} else if (c == 'o') {
 			output_fn = optarg;
 		} else return usage();
@@ -50,7 +45,7 @@ int main(int argc, char *argv[]) {
 	auto snps = input_snp(vcf_fn);
 	std::sort(snps.begin(), snps.end());
 	std::cerr << "Input " << snps.size() << " SNPs" << std::endl;
-	global_snps = snps;
+//	global_snps = snps;
 
 	SNP_DBG dbg(K, snps.size());
 	dbg.construct_graph(snps);
