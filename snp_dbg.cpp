@@ -91,7 +91,7 @@ void SNP_DBG::construct_graph(std::vector<SNP> &snps) const {
 	cigar.destroy();
 
 	int node_intv = (1<<K), edge_intv = (1<<(K+1));
-	for (int i = K-1; i < snps.size() - K+1; i++) {
+	for (int i = 1; i+K-1 < snp_n; i++) {
 		// We are considering the consecutive K+1 SNPs: {i-1, i, ..., i+K-2, i+K-1}
 		// u = (i-1, i, ..., i+K-2)
 		// v =      (i, ..., i+K-2, i+K-1)
@@ -110,7 +110,17 @@ void SNP_DBG::construct_graph(std::vector<SNP> &snps) const {
 			weight[i * edge_intv + j] = (int)std::ceil(0.2 * (weight_u + weight_v)) + weight_edge;
 		}
 	}
-	std::cerr << "Construct graph done" << std::endl;
+	int nodes_n = 0, edges_n = 0;
+	for (int i = 0; i+K-1 < snp_n; i++) {
+		for (int j = 0; j < node_intv; j++) {
+			if (node_cnt[i * node_intv + j] > 0) {
+				nodes_n++;
+				edges_n += out_degree(i, j);
+			}
+		}
+	}
+	std::cerr << "Construct graph done; " << edges_n << " edges; " <<
+	          "averaged out-degree: " << 1.0 * edges_n / nodes_n << std::endl;
 }
 
 #include <sstream>
@@ -314,9 +324,7 @@ void SNP_DBG::trim_graph() {
 				keep_node_u[node_u] = true;
 				keep_node_v[node_v] = true;
 				keep_edge[j] = true;
-			} else {
-				trim_n++;
-			}
+			} else trim_n++;
 		}
 
 		for (uint32_t j = 0; j < edge_intv; j++) {
@@ -341,7 +349,17 @@ void SNP_DBG::trim_graph() {
 			if (!keep_edge[j]) weight[i * edge_intv + j] = 0;
 		}
 	}
-	std::cerr << "Trim " << trim_n << " edges" << std::endl;
+	int nodes_n = 0, edges_n = 0;
+	for (int i = 0; i+K-1 < snp_n; i++) {
+		for (int j = 0; j < node_intv; j++) {
+			if (node_cnt[i * node_intv + j] > 0) {
+				nodes_n++;
+				edges_n += out_degree(i, j);
+			}
+		}
+	}
+	std::cerr << "Trim " << trim_n << " edges; " <<
+	          "averaged out-degree: " << 1.0 * edges_n / nodes_n << std::endl;
 	check_graph_symmetry();
 }
 

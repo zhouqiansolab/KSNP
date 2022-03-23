@@ -22,8 +22,6 @@ double realtime(){
 	return tp.tv_sec + tp.tv_usec * 1e-6;
 }
 
-std::vector<SNP> global_snps; // For debug only
-
 int main(int argc, char *argv[]) {
 	if (argc == 1) return usage();
 	double time_s = realtime();
@@ -45,7 +43,6 @@ int main(int argc, char *argv[]) {
 	auto snps = input_snp(vcf_fn);
 	std::sort(snps.begin(), snps.end());
 	std::cerr << "Input " << snps.size() << " SNPs" << std::endl;
-//	global_snps = snps;
 
 	SNP_DBG dbg(K, snps.size());
 	dbg.construct_graph(snps);
@@ -53,14 +50,15 @@ int main(int argc, char *argv[]) {
 	dbg.remove_tip();
 	dbg.remove_bubble();
 	dbg.remove_tip_again();
-	auto blocks = dbg.snp_haplotype(); dbg.destroy();
+	auto blocks = dbg.snp_haplotype();
+	dbg.destroy();
 
 	auto ro_blocks = remove_overlap(blocks);
 	auto results = merge_blocks(ro_blocks, snps);
 	results.write_vcf(vcf_fn, output_fn);
 
 	// Free memory for blocks and resolution reads
-	for (auto &b : blocks) free(b.bit); blocks.clear();
+	for (auto &b : ro_blocks) free(b.bit); ro_blocks.clear();
 	for (auto &s : snps) s.destroy(); snps.clear();
 	results.destroy();
 

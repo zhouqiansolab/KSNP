@@ -165,41 +165,117 @@ void Phased_Result::write_vcf(const char *src, const char *dst) {
 	FILE *f_out = fopen(dst, "w");
 	int line_n = 0, pid = 0;
 	const int SNP_BUF_SIZE = 4 * 1024 * 1024;
-	char *buf = new char[SNP_BUF_SIZE];
+	char *buf = (char*) malloc(SNP_BUF_SIZE * sizeof(char));
 	std::vector<int> pos;
+	bool format_GT = false, format_GQ = false, format_PS = false;
+	bool format_fields = false;
 	while (gzgets(f_in, buf, SNP_BUF_SIZE)) {
+		// VCF headers
 		if (buf[0] == '#') {
+			std::string header(buf);
+			if (header.find("##FORMAT") != std::string::npos) format_fields = true;
+			if (header.find("##FORMAT=<ID=GT") != std::string::npos) format_GT = true;
+			if (header.find("##FORMAT=<ID=GQ") != std::string::npos) format_GQ = true;
+			if (header.find("##FORMAT=<ID=PS") != std::string::npos) format_PS = true;
+			if (header.find("##FORMAT") == std::string::npos && format_fields && !format_GT)
+				fprintf(f_out, "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n");
+			if (header.find("##FORMAT") == std::string::npos && format_fields && !format_GQ)
+				fprintf(f_out, "##FORMAT=<ID=GQ,Number=1,Type=Float,Description=\"Genotype Quality\">\n");
+			if (header.find("##FORMAT") == std::string::npos && format_fields && !format_PS)
+				fprintf(f_out, "##FORMAT=<ID=PS,Number=1,Type=Integer,Description=\"Phase Set\">\n");
+			if (header.find("##FORMAT") == std::string::npos && format_fields) format_fields = false;
 			fprintf(f_out, "%s", buf);
 			continue;
 		}
-		int last_tab = 0;
-		for (int i = 0; buf[i]; i++) if (buf[i] == '\t') last_tab = i;
-		buf[last_tab] = '\0';
 
-		int first_tab = 0, num = 0;
-		for (int i = 0; buf[i]; i++) if (buf[i] == '\t') { first_tab = i; break; }
-		for (int i = first_tab + 1; buf[i] != '\t'; i++) { num *= 10; num += buf[i] - '0'; }
-		pos.push_back(num);
+		// VCF columns
+		const char *CHROM, *POS, *ID;
+		const char *REF, *ALT, *QUAL, *FILTER;
+		const char *INFO, *FORMAT, *SAMPLE;
+		int tab_n = 0;
+		for (int i = 0; buf[i]; i++) {
+			if (i == 0) {
+				CHROM = buf + i;
+			} else if (buf[i] == '\t') {
+				tab_n++;
+				if (tab_n == 1) POS = buf + i + 1;
+				else if (tab_n == 2) ID = buf + i + 1;
+				else if (tab_n == 3) REF = buf + i + 1;
+				else if (tab_n == 4) ALT = buf + i + 1;
+				else if (tab_n == 5) QUAL = buf + i + 1;
+				else if (tab_n == 6) FILTER = buf + i + 1;
+				else if (tab_n == 7) INFO = buf + i + 1;
+				else if (tab_n == 8) FORMAT = buf + i + 1;
+				else if (tab_n == 9) SAMPLE = buf + i + 1;
+				buf[i] = '\0';
+			} else if (buf[i] == '\n') buf[i] = '\0';
+		}
+		pos.push_back(atoi(POS));
 
-		fprintf(f_out, "%s\t", buf);
-
-		int xi = 0;
-		std::string x[5];
-		for (int i = last_tab+1; buf[i] != '\n'; i++) {
-			if (buf[i] == ':') xi++;
-			else x[xi] += buf[i];
+		// (format, sample) key-value pairs
+		std::vector<std::string> key, value;
+		std::string temp;
+		for (int i = 0; true; i++) {
+			if (FORMAT[i] == '\0') {
+				key.push_back(temp);
+				break;
+			} else if (FORMAT[i] == ':') {
+				key.push_back(temp);
+				temp = "";
+			} else {
+				temp += FORMAT[i];
+			}
+		}
+		temp = "";
+		for (int i = 0; true; i++) {
+			if (SAMPLE[i] == '\0') {
+				value.push_back(temp);
+				break;
+			} else if (SAMPLE[i] == ':') {
+				value.push_back(temp);
+				temp = "";
+			} else {
+				temp += SAMPLE[i];
+			}
+		}
+		assert(key.size() == value.size());
+		bool has_gt = false, has_gq = false, has_ps = false;
+		for (const auto &k : key) {
+			if (k == "GT") has_gt = true;
+			else if (k == "GQ") has_gq = true;
+			else if (k == "PS") has_ps = true;
+		}
+		if (!has_gt) { key.emplace_back("GT"); value.emplace_back("."); }
+		if (!has_gq) { key.emplace_back("GQ"); value.emplace_back("."); }
+		if (!has_ps) { key.emplace_back("PS"); value.emplace_back("."); }
+		// It is recommended that re-arrange GT:GQ:PS ahead.
+		for (int i = 0; i < key.size(); i++) {
+			if (key[i] == "GT") { std::swap(key[i], key[0]); std::swap(value[i], value[0]); }
+			if (key[i] == "GQ") { std::swap(key[i], key[1]); std::swap(value[i], value[1]); }
+			if (key[i] == "PS") { std::swap(key[i], key[2]); std::swap(value[i], value[2]); }
 		}
 
 		while (pid < n && index[pid] < line_n) pid++;
 		if (pid < n && index[pid] == line_n) {
-			if (bit[pid] == 1) fprintf(f_out, "1|0");
-			else fprintf(f_out, "0|1");
+			if (bit[pid] == 1) value[0] = "1|0"; else value[0] = "0|1";
 			assert(head[pid] < pos.size());
-			fprintf(f_out, ":%s:%d:%s:%s\n", x[1].c_str(), pos[head[pid]], x[3].c_str(), x[4].c_str());
-		} else fprintf(f_out, "%s:%s:%s:%s:%s\n", x[0].c_str(), x[1].c_str(), x[2].c_str(), x[3].c_str(), x[4].c_str());
+			value[2] = std::to_string(pos[head[pid]]);
+		}
 
+		// Output phased VCF
+		fprintf(f_out, "%s\t%s\t%s\t", CHROM, POS, ID);
+		fprintf(f_out, "%s\t%s\t%s\t%s\t%s\t", REF, ALT, QUAL, FILTER, INFO);
+		for (int i = 0; i < key.size(); i++)
+			if (i == 0) fprintf(f_out, "%s", key[i].c_str());
+			else fprintf(f_out, ":%s", key[i].c_str());
+		fprintf(f_out, "\t");
+		for (int i = 0; i < value.size(); i++)
+			if (i == 0) fprintf(f_out, "%s", value[i].c_str());
+			else fprintf(f_out, ":%s", value[i].c_str());
+		fprintf(f_out, "\n");
 		line_n++;
 	}
+	free(buf);
 	pos.clear();
 	gzclose(f_in); fclose(f_out);
 	std::cerr << "The phased results are written into VCF file" << std::endl;
