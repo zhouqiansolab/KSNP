@@ -33,9 +33,7 @@ struct SNP_DBG {
 		(edge_cnt + (1<<(K+1)) * p)[e]++;
 	}
 
-	void construct_graph(std::vector<SNP> &snps) const;
-
-	void input_graph_from_file(const char *fn, const std::vector<SNP> &snps) const;
+	void construct_graph(const char *bam_fn, std::vector<SNP> &snps) const;
 
 	inline bool filter_edge(int heaviest, int edge_weight) ;
 
@@ -69,42 +67,11 @@ struct SNP_DBG {
 
 	std::vector<SNP_Block> snp_haplotype();
 
-	void output(const std::vector<SNP> &snps);
-
 	void destroy() const {
 		free(node_cnt);
 		free(edge_cnt);
 		free(weight);
 	}
-};
-
-// The SAM structure only keeps necessary fields
-struct SAM_Record {
-	char *que_name;
-	int flag;
-	char *ref_name;
-	int ref_start;
-	char *cigar;
-	char *bases;
-
-	SAM_Record(char *s);
-};
-
-struct Parsed_CIGAR {
-	int n, m;
-	int *num;
-	char *op;
-
-	Parsed_CIGAR() {
-		n = 0;
-		m = 512;
-		num = (int*) malloc(m * sizeof(int));
-		op = (char*) malloc(m * sizeof(char));
-	}
-
-	void parse(const char *cigar);
-
-	void destroy() const { free(num); free(op); }
 };
 
 #endif //KSNP_SNP_DBG_H

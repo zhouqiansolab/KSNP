@@ -65,82 +65,6 @@ std::vector<SNP_Block> remove_overlap(std::vector<SNP_Block> &blocks) {
 }
 
 extern std::string global_chrom;
-extern std::vector<SNP> global_snps;
-
-std::vector<SNP_Block> input_blocks_from_file(const char *fn) {
-	freopen(fn, "r", stdin);
-	std::vector<SNP_Block> ret;
-	while (true) {
-		std::string block_id; std::cin >> block_id;
-		if (std::cin.eof()) break;
-		std::string chrom; std::cin >> chrom; global_chrom = chrom;
-		std::string pos_list; std::cin >> pos_list;
-		std::string base_list; std::cin >> base_list;
-		std::vector<int> pos_v;
-		int num = 0;
-		for (auto c : pos_list) {
-			if (c == '_') {
-				pos_v.push_back(num);
-				num = 0;
-			} else {
-				num *= 10;
-				num += c - '0';
-			}
-		}
-		pos_v.push_back(num);
-		assert(pos_v.size() == base_list.size());
-		int p = binary_search(global_snps, pos_v[0]);
-		assert(p != -1 && pos_v[0] == global_snps[p].pos);
-		int n = pos_v.size();
-		SNP_Block b(p);
-		for (int i = 0; i < n; i++) {
-			if (global_snps[p + i].alt == base_list[i]) b.add(1);
-			else b.add(0);
-		}
-		ret.push_back(b);
-
-		std::cin >> block_id >> chrom >> pos_list >> base_list; // Skip the mate line
-	}
-	std::cerr << "Input " << ret.size() << " blocks from stdin" << std::endl;
-	fclose(stdin);
-	return ret;
-}
-
-void view_merged_blocks() {
-	int blocks_n = 0, merge_n = 0;
-	while (true) {
-		blocks_n++;
-		std::string block_id; std::cin >> block_id;
-		if (std::cin.eof()) break;
-		std::string chrom; std::cin >> chrom;
-		std::string pos_list; std::cin >> pos_list;
-		std::string base_list; std::cin >> base_list;
-		std::vector<int> pos_v;
-		int num = 0;
-		for (auto c : pos_list) {
-			if (c == '_') {
-				pos_v.push_back(num);
-				num = 0;
-			} else {
-				num *= 10;
-				num += c - '0';
-			}
-		}
-		pos_v.push_back(num);
-		assert(pos_v.size() == base_list.size());
-		for (int i = 1; i < pos_v.size(); i++) {
-			int p1 = binary_search(global_snps, pos_v[i-1]);
-			int p2 = binary_search(global_snps, pos_v[i]);
-			if (p2 != p1 + 1) {
-				merge_n++;
-			}
-		}
-		std::cin >> block_id >> chrom >> pos_list >> base_list; // Skip the mate line
-	}
-	std::cerr << "Collect " << blocks_n << " block pairs" << std::endl;
-	std::cerr << "Found " << merge_n << " merged blocks" << std::endl;
-}
-
 
 void Phased_Result::add(const SNP_Block &b) {
 	for (int i = 0; i < b.n; i++) {
@@ -162,7 +86,11 @@ void Phased_Result::merge(const SNP_Block &b, bool reversed) {
 
 void Phased_Result::write_vcf(const char *src, const char *dst) {
 	gzFile f_in = gzopen(src, "r");
-	FILE *f_out = fopen(dst, "w");
+	FILE *f_out = dst ?fopen(dst, "w") :stdout;
+	if (f_out == nullptr) {
+		std::cerr << "Open output file " << dst << " failed" << std::endl;
+		std::abort();
+	}
 	int line_n = 0, pid = 0;
 	const int SNP_BUF_SIZE = 4 * 1024 * 1024;
 	char *buf = (char*) malloc(SNP_BUF_SIZE * sizeof(char));
@@ -277,7 +205,7 @@ void Phased_Result::write_vcf(const char *src, const char *dst) {
 	}
 	free(buf);
 	pos.clear();
-	gzclose(f_in); fclose(f_out);
+	gzclose(f_in); if (dst) fclose(f_out);
 	std::cerr << "The phased results are written into VCF file" << std::endl;
 }
 
@@ -363,77 +291,4 @@ Phased_Result merge_blocks(const std::vector<SNP_Block> &blocks, const std::vect
 	std::cerr << "In the end, there are " << merged_n << " merged blocks" << std::endl;
 
 	return ret;
-}
-
-void Phased_Result::output() {
-	int blocks_n = 1;
-	for (int i = 1; i < n; i++) if (head[i] != head[i-1]) blocks_n++;
-
-	std::vector<int> pos[blocks_n];
-	std::string base[blocks_n], rev_base[blocks_n];
-
-	blocks_n = 0;
-	for (int i = 0; i < n; i++) {
-		if (i > 0 && head[i] != head[i-1]) blocks_n++;
-
-		pos[blocks_n].push_back(global_snps[index[i]].pos);
-		if (bit[i] == 1) {
-			base[blocks_n] += global_snps[index[i]].alt;
-			rev_base[blocks_n] += global_snps[index[i]].ref;
-		} else {
-			base[blocks_n] += global_snps[index[i]].ref;
-			rev_base[blocks_n] += global_snps[index[i]].alt;
-		}
-	}
-
-	for (int i = 0; i <= blocks_n; i++) {
-		std::cout << "block" << 2*i+1 << "\t" << global_chrom.c_str() << "\t";
-		for (int j = 0; j < pos[i].size(); j++) {
-			if (j > 0) std::cout << "_";
-			std::cout << pos[i][j];
-		}
-		std::cout << "\t" << base[i] << std::endl;
-
-		std::cout << "block" << 2*i+2 << "\t" << global_chrom.c_str() << "\t";
-		for (int j = 0; j < pos[i].size(); j++) {
-			if (j > 0) std::cout << "_";
-			std::cout << pos[i][j];
-		}
-		std::cout << "\t" << rev_base[i] << std::endl;
-	}
-}
-
-void output_blocks(const std::vector<SNP_Block> &blocks) {
-	for (int i = 0; i < blocks.size(); i++) {
-		fprintf(stdout, "block%d\t", 2*i+1);
-		fprintf(stdout, "%s\t", global_chrom.c_str());
-		const auto &b = blocks[i];
-		for (int j = 0; j < b.n; j++) {
-			if (j > 0) fprintf(stdout, "_");
-			assert(b.anchor + j < global_snps.size());
-			fprintf(stdout, "%d", global_snps[b.anchor + j].pos);
-		}
-		fprintf(stdout, "\t");
-		for (int j = 0; j < b.n; j++) {
-			assert(b.anchor + j < global_snps.size());
-			if (b.bit[j] == 0) fprintf(stdout, "%c", global_snps[b.anchor + j].ref);
-			else fprintf(stdout, "%c", global_snps[b.anchor + j].alt);
-		}
-		fprintf(stdout, "\n");
-
-		fprintf(stdout, "block%d\t", 2*i+2);
-		fprintf(stdout, "%s\t", global_chrom.c_str());
-		for (int j = 0; j < b.n; j++) {
-			if (j > 0) fprintf(stdout, "_");
-			assert(b.anchor + j < global_snps.size());
-			fprintf(stdout, "%d", global_snps[b.anchor + j].pos);
-		}
-		fprintf(stdout, "\t");
-		for (int j = 0; j < b.n; j++) {
-			assert(b.anchor + j < global_snps.size());
-			if ((b.bit[j] ^ 1) == 0) fprintf(stdout, "%c", global_snps[b.anchor + j].ref);
-			else fprintf(stdout, "%c", global_snps[b.anchor + j].alt);
-		}
-		fprintf(stdout, "\n");
-	}
 }

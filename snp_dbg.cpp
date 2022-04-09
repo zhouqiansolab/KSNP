@@ -8,62 +8,60 @@
 #include <cstring>
 
 #include "snp_dbg.h"
+#include "htslib/sam.h"
 
 extern std::string global_chrom;
 
-void SNP_DBG::construct_graph(std::vector<SNP> &snps) const {
-	const int SAM_BUF_SIZE = 24 * 1024 * 1024;
-	char *buf = new char[SAM_BUF_SIZE];
-	Parsed_CIGAR cigar;
+void SNP_DBG::construct_graph(const char *bam_fn, std::vector<SNP> &snps) const {
+	samFile *bam_fp = sam_open(bam_fn, "r");
+	bam_hdr_t *bam_header = sam_hdr_read(bam_fp);
+	bam1_t *aln = bam_init1();
 	int read_id = 0;
-	while (true) {
-		if (!fgets(buf, SAM_BUF_SIZE, stdin)) break;
-		if (buf[0] == '@') continue;
+	while (sam_read1(bam_fp, bam_header, aln) >= 0) {
 		read_id++;
-
-		// Parse SAM record line
-		SAM_Record sam(buf);
-
-		int bs = binary_search(snps, sam.ref_start);
+		int ref_start = aln->core.pos + 1;
+		int bs = binary_search(snps, ref_start);
 		if (bs == -1) continue;
 
-		cigar.parse(sam.cigar);
 		int read_len = 0, ref_len = 0;
-		for (int i = 0; i < cigar.n; i++) {
-			const auto &p = std::make_pair(cigar.num[i], cigar.op[i]);
-			if (p.second != 'D' && p.second != 'H') read_len += p.first;
-			if (p.second != 'I' && p.second != 'S' && p.second != 'H') ref_len += p.first;
+		const uint32_t *cigar_array = bam_get_cigar(aln);
+		for (int i = 0; i < aln->core.n_cigar; i++) {
+			char op_chr = bam_cigar_opchr(cigar_array[i]);
+			int op_len = bam_cigar_oplen(cigar_array[i]);
+			if (op_chr != 'D' && op_chr != 'H') read_len += op_len;
+			if (op_chr != 'I' && op_chr != 'S' && op_chr != 'H') ref_len += op_len;
 		}
 
-		int cid = 0, que_pointer = 0, ref_pointer = sam.ref_start;
+		int cid = 0, que_pointer = 0, ref_pointer = ref_start;
 		uint32_t node_kmer = 0, NODE_MASK = (1<<K) - 1;
 		uint32_t edge_kmer = 0, EDGE_MARK = (1<<(K+1)) - 1;
 		int count = 0;
 		for (int i = bs; i < snps.size(); i++) {
 			auto &s = snps[i];
-			if (s.pos >= sam.ref_start + ref_len) break;
+			if (s.pos >= ref_start + ref_len) break;
 			// Find the cigar interval overlapping the SNP.
 			// The cigar intervals are consecutive.
 			// For example, 12D2X193I= has cigar intervals [0,12), [12, 14), [14, 33), [33, 33).
-			while (cid < cigar.n) {
-				const auto &p = std::make_pair(cigar.num[cid], cigar.op[cid]);
-				if (p.second == 'H') { cid++; continue; }
-				if (p.second == 'I' || p.second == 'S') {
-					que_pointer += p.first;
+			while (cid < aln->core.n_cigar) {
+				char op_chr = bam_cigar_opchr(cigar_array[cid]);
+				int op_len = bam_cigar_oplen(cigar_array[cid]);
+				if (op_chr == 'H') { cid++; continue; }
+				if (op_chr == 'I' || op_chr == 'S') {
+					que_pointer += op_len;
 					cid++;
 					continue;
 				}
 				assert(ref_pointer <= s.pos);
-				if (ref_pointer + p.first > s.pos) break; // The cigar interval overlapping the SNP
-				ref_pointer += p.first;
-				if (p.second != 'D') que_pointer += p.first;
+				if (ref_pointer + op_len > s.pos) break; // The cigar interval overlapping the SNP
+				ref_pointer += op_len;
+				if (op_chr != 'D') que_pointer += op_len;
 				cid++;
 			}
 
-			assert(cid < cigar.n);
-			const auto &p = std::make_pair(cigar.num[cid], cigar.op[cid]);
-			int que_pos = p.second == 'D' ?que_pointer - 1 :que_pointer + s.pos - ref_pointer;
-			char que_base = p.second == 'D' ?'-' :sam.bases[que_pos];
+			char op_chr = bam_cigar_opchr(cigar_array[cid]);
+			int que_pos = op_chr == 'D' ?que_pointer - 1 :que_pointer + s.pos - ref_pointer;
+			const uint8_t *encoded_seq = bam_get_seq(aln);
+			char que_base = op_chr == 'D' ?'-' :seq_nt16_str[bam_seqi(encoded_seq, que_pos)];
 
 			if (que_base == '-' || (que_base != s.ref && que_base != s.alt)) {
 				node_kmer = 0; edge_kmer = 0; count = 0;
@@ -87,8 +85,9 @@ void SNP_DBG::construct_graph(std::vector<SNP> &snps) const {
 			}
 		}
 	}
-	delete [] buf;
-	cigar.destroy();
+	bam_destroy1(aln);
+	bam_hdr_destroy(bam_header);
+	sam_close(bam_fp);
 
 	int node_intv = (1<<K), edge_intv = (1<<(K+1));
 	for (int i = 1; i+K-1 < snp_n; i++) {
@@ -121,114 +120,6 @@ void SNP_DBG::construct_graph(std::vector<SNP> &snps) const {
 	}
 	std::cerr << "Construct graph done; " << edges_n << " edges; " <<
 	          "averaged out-degree: " << 1.0 * edges_n / nodes_n << std::endl;
-}
-
-#include <sstream>
-struct DBG_Node {
-	std::string chrom;
-	std::vector<int> pos;
-	char *bases;
-	DBG_Node(int K, const std::string &a);
-	void output();
-};
-
-DBG_Node::DBG_Node(int K, const std::string &a) {
-	int i;
-	for (i = 1; i < a.length(); i++) {
-		if (a[i] == '_') {
-			i++;
-			break;
-		}
-		chrom += a[i];
-	}
-	for (int k = 0; k < K; k++) {
-		int num = 0;
-		for (; i < a.length(); i++) {
-			if (a[i] == '_') {
-				pos.push_back(num);
-				i++;
-				break;
-			}
-			num *= 10;
-			num += a[i] - '0';
-		}
-	}
-	bases = (char*) malloc((K + 1) *  sizeof(char));
-	for (int k = 0; k < K; k++) {
-		bases[k] = a[i + k];
-	}
-	bases[K] = '\0';
-}
-
-void DBG_Node::output() {
-	std::cerr << chrom << "\t";
-	for (auto p : pos) std::cerr << p << "\t";
-	std::cerr << bases << std::endl;
-}
-
-int parse_label(const std::string &a) {
-	for (int i = 0; i < a.length(); i++) {
-		if (a[i] == '"') {
-			int ret = 0;
-			for (int j = i+1; j < a.length(); j++) {
-				if (a[j] == '"') return ret;
-				ret *= 10;
-				ret += a[j] - '0';
-			}
-		}
-	}
-	return -1;
-}
-
-void SNP_DBG::input_graph_from_file(const char *fn, const std::vector<SNP> &snps) const {
-	freopen(fn, "r", stdin);
-	memset(weight, 0, snp_n * (1<<(K+1)) * sizeof(int));
-	std::string line;
-	int cnt = 0;
-	while (std::getline(std::cin, line)) {
-		if (line.find('{') != -1 || line.find('}') != -1) continue;
-		std::stringstream ss(line);
-		std::string node_u; ss >> node_u;
-		std::string dummy; ss >> dummy;
-		std::string node_v; ss >> node_v;
-		std::string label; ss >> label;
-		std::string color; ss >> color;
-		DBG_Node u(K, node_u);
-		DBG_Node v(K, node_v);
-		global_chrom = u.chrom;
-		for (int i = 0; i < K-1; i++) {
-			assert(u.pos[i+1] == v.pos[i]);
-			assert(u.bases[i+1] == v.bases[i]);
-		}
-
-		// Locate the position of the edge on SNPs list
-		int snp_id = binary_search(snps, u.pos[0]);
-		assert(snp_id != -1 && snps[snp_id].pos == u.pos[0]);
-		std::string edge_bases = u.bases; edge_bases += v.bases[K-1];
-
-		// Encode the edge bases bitwise
-		uint32_t encoded_bases = 0;
-		for(int i = 0; i <= K; i++) {
-			encoded_bases <<= 1;
-			assert(edge_bases[i] == snps[snp_id + i].alt || edge_bases[i] == snps[snp_id + i].ref);
-			uint32_t bit = (edge_bases[i] == snps[snp_id + i].alt) ?1 :0;
-			encoded_bases |= bit;
-		}
-		weight[(snp_id + 1) * (1<<(K+1)) + encoded_bases] = parse_label(label);
-		assert(parse_label(label) > 0);
-
-		// Check the correctness of encoding
-		std::string temp;
-		for (int i = 0; i <= K; i++) {
-			if ((encoded_bases & (1<<i)) != 0) temp += snps[snp_id + K-i].alt;
-			else temp += snps[snp_id + K-i].ref;
-		}
-		std::reverse(temp.begin(), temp.end());
-		assert(edge_bases == temp);
-		cnt++;
-	}
-	std::cerr << "Load " << cnt << " edges from stdin" << std::endl;
-	fclose(stdin);
 }
 
 SNP_Block SNP_DBG::traversal_block(int p, int u) {
@@ -628,75 +519,6 @@ void SNP_DBG::check_graph_symmetry() {
 			int edge_intv = (1<<(K+1));
 			int edge_r = (~edge) & (edge_intv - 1);
 			assert(weight[i * edge_intv + edge] == weight[i * edge_intv + edge_r]);
-		}
-	}
-}
-
-void SNP_DBG::output(const std::vector<SNP> &snps) {
-	int edge_intv = (1<<(K+1));
-	int snp_buf[K+1];
-	const std::string color[] = {"red", "blue", "green"};
-	fprintf(stdout, "digraph 1 {\n");
-	for (int i = 1; i+K-1 < snps.size(); i++) {
-		for (uint32_t j = 0; j < edge_intv; j++) {
-			for (int k = 0; k < K+1; k++) snp_buf[k] = ((j>>k) & 1);
-			int depth = weight[i * edge_intv + j];
-			if (depth == 0) continue;
-
-			fprintf(stdout, "\"%s_", global_chrom.c_str());
-			for (int k = 0; k < K; k++) fprintf(stdout, "%d_", snps[i-1+k].pos);
-			// SNP_buf K,   K-1, ..., 1,     0
-			// SNP     i-1, i,   ..., i+K-2, i+K-1
-			for (int k = 0; k < K; k++) fprintf(stdout, "%c", snp_buf[K-k] == 1 ?snps[i-1+k].alt :snps[i-1+k].ref);
-			fprintf(stdout, "\" -> ");
-
-			fprintf(stdout, "\"%s_", global_chrom.c_str());
-			for (int k = 0; k < K; k++) fprintf(stdout, "%d_", snps[i+k].pos);
-			for (int k = 0; k < K; k++) fprintf(stdout, "%c", snp_buf[K-1-k] == 1 ?snps[i+k].alt :snps[i+k].ref);
-			fprintf(stdout, "\" ");
-
-			int cid;
-			if (depth < 5) cid = 0;
-			else if (depth < 11) cid = 1;
-			else cid = 2;
-			fprintf(stdout, "[label=\"%d\" color=\"%s\"]\n", depth, color[cid].c_str());
-		}
-	}
-	fprintf(stdout, "}\n");
-}
-
-SAM_Record::SAM_Record(char *s) {
-	int i = 0;
-	que_name = s; for (; s[i]; i++) if (s[i] == '\t') { s[i] = '\0'; i++; break; }
-	flag = 0; for (; s[i]; i++) if (s[i] == '\t') { i++; break;} else { flag *= 10; flag += s[i] - '0'; }
-	ref_name = s + i; for (; s[i]; i++) if (s[i] == '\t') { s[i] = '\0'; i++; break; }
-	ref_start = 0; for (; s[i]; i++) if (s[i] == '\t') { i++; break;} else { ref_start *= 10; ref_start += s[i] - '0'; }
-	for (; s[i]; i++) if (s[i] == '\t') { i++; break; }
-	cigar = s + i; for (; s[i]; i++) if (s[i] == '\t') { s[i] = '\0'; i++; break; }
-	for (; s[i]; i++) if (s[i] == '\t') { i++; break; }
-	for (; s[i]; i++) if (s[i] == '\t') { i++; break; }
-	for (; s[i]; i++) if (s[i] == '\t') { i++; break; }
-	bases = s + i; for (; s[i]; i++) if (s[i] == '\t') { s[i] = '\0'; break; }
-}
-
-void Parsed_CIGAR::parse(const char *cigar) {
-	n = 0;
-	int x = 0;
-	for (int i = 0; cigar[i]; i++) {
-		char c = cigar[i];
-		if (c >= '0' && c <= '9') {
-			x *= 10;
-			x += c - '0';
-		} else {
-			if (n >= m) {
-				m <<= 1;
-				num = (int*) realloc(num, m * sizeof(int));
-				op = (char*) realloc(op, m * sizeof(char));
-			}
-			num[n] = x;
-			op[n] = c;
-			n++;
-			x = 0;
 		}
 	}
 }

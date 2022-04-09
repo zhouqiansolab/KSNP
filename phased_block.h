@@ -51,8 +51,6 @@ struct Phased_Result {
 
 	void write_vcf(const char *src, const char *dst);
 
-	void output();
-
 	void destroy() const {
 		free(index); free(bit); free(head);
 	}
@@ -60,12 +58,6 @@ struct Phased_Result {
 
 std::vector<SNP_Block> remove_overlap(std::vector<SNP_Block> &blocks);
 
-std::vector<SNP_Block> input_blocks_from_file(const char *fn);
-
-void view_merged_blocks();
-
 Phased_Result merge_blocks(const std::vector<SNP_Block> &blocks, const std::vector<SNP> &ros);
-
-void output_blocks(const std::vector<SNP_Block> &blocks);
 
 #endif //KSNP_PHASED_BLOCK_H
