@@ -11,7 +11,7 @@
 ```
 git clone https://github.com/zhouqiansolab/KSNP-k-mer-based-haplotype-assembly.git
 cd KSNP-k-mer-based-haplotype-assembly
-./install
+./install.sh
 ```
 If the installation is successful, the build subdirectory will contain the `ksnp` binary.
 ## Usage
