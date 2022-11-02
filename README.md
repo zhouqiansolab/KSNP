@@ -9,8 +9,8 @@
 - htslib 1.15.1
 
 ```
-git clone https://github.com/zhouqiansolab/KSNP-k-mer-based-haplotype-assembly.git
-cd KSNP-k-mer-based-haplotype-assembly
+git clone https://github.com/zhouqiansolab/KSNP-DBG-based-haplotyping-using-SNPs-as-K-mer.git
+cd KSNP-DBG-based-haplotyping-using-SNPs-as-K-mer
 ./install.sh
 ```
 If the installation is successful, the build subdirectory will contain the `ksnp` binary.
