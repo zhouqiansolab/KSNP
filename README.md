@@ -1,4 +1,4 @@
-# KSNP: DBG-based haplotype assembly using SNPs as K-mer
+# KSNP: DBG-based haplotyping using SNPs as K-mer
 
 ## Download and install
 
