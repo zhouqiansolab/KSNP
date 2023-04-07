@@ -7,13 +7,14 @@
 - gcc >= 6.4
 - htslib 1.15.1
 
-Before KSNP installation, keep sure the dependency htslib has been correctly installed.
-If it is not in default system path, please add its directory to environmental variable `LD_LIBRARY_PATH`.
+Before KSNP installation, keep sure the dependency htslib (https://github.com/samtools/htslib/releases/download/1.15.1/htslib-1.15.1.tar.bz2) 
+has been successfully installed.
 
 ```
 git clone https://github.com/zhouqiansolab/KSNP
 cd KSNP; mkdir build; cd build
-cmake ..; make
+cmake .. -DHTSLIB=#htslib installtion path 
+make
 ```
 
 If the installation is successful, the build subdirectory will contain the `ksnp` binary.
