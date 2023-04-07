@@ -1,5 +1,5 @@
 set(CMAKE_LEGACY_CYGWIN_WIN32 0)
-project(ksnp_dev)
+project(KSNP)
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -28,5 +28,8 @@ set(SOURCE_FILES
         time_stamp.h)
 
 # Dependencies
+if (HTSLIB)
+    link_directories(${HTSLIB})
+endif()
 add_executable(ksnp ${SOURCE_FILES} main.cpp)
 target_link_libraries(ksnp -lhts -lz)
