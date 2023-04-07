@@ -5,25 +5,29 @@
 **Dependencies**
 - cmake >= 3.10
 - gcc >= 6.4
-- zlib >= 1.2
 - htslib 1.15.1
 
+Before KSNP installation, keep sure the dependency htslib has been correctly installed.
+If it is not in default system path, please add its directory to environmental variable `LD_LIBRARY_PATH`.
+
 ```
-git clone https://github.com/zhouqiansolab/KSNP-k-mer-based-haplotype-assembly.git
-cd KSNP-k-mer-based-haplotype-assembly
-./install
+git clone https://github.com/zhouqiansolab/KSNP
+cd KSNP; mkdir build; cd build
+cmake ..; make
 ```
+
 If the installation is successful, the build subdirectory will contain the `ksnp` binary.
 ## Usage
 ```
-ksnp -k <k-mer size> -b <BAM file> -v <VCF file> -o <output file>
-  ## K-mer size supports INT value from 2 to 10 (default value is 2)
-  ## The in.bam is sorted and indexed. The chr_name is not required when the in.bam only includes one chromosome.
-  ## The VCF file should contain SNP positions on one chromosome. Please split the VCF file into small files according to the chr_name. The VCF file can be in be in compressed gz format or decompressed format.
-  ## The output file includes all of the variants in input VCF file with phased information.
-  ## Without specifying the output file, the phased VCF is print to stdout.
-  
+ksnp -k <k-mer size> -b <BAM> -r <FASTA> -v <VCF> -o <output file>
+  ## The k-mer size supports INT value from 2 to 5. Default value is set to 2.
+  ## BAM file contains the aligned reads. It must be sorted and indexed.
+  ## FASTA file is the reference sequence used for reads alignment and variants calling. It should be indexed by 'samtools faidx'
+  ## VCF file contains the heterozygous variants to phase. It should be properly filtered before phasing.
+  ## The output file keeps all varinats in input VCF file but with phased information. Without specifying it, the results will be print to stdout.
+  ## Sample usage: ksnp -b aln.bam -r ref.fa -v variants.vcf -o phased.vcf
 ```
+
 ## Contact
 ```
 zhouqian_solab@163.com

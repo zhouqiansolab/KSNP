@@ -1,14 +1,32 @@
+set(CMAKE_LEGACY_CYGWIN_WIN32 0)
+project(ksnp_dev)
 cmake_minimum_required(VERSION 3.10)
-project(ksnp)
-
 set(CMAKE_CXX_STANDARD 11)
-add_compile_options(-g -O3)
-include_directories(htslib-1.15.1/include)
-link_directories(htslib-1.15.1/lib)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(ksnp main.cpp
-        vcf_reader.cpp vcf_reader.h
-        snp_dbg.cpp snp_dbg.h
-        phased_block.cpp phased_block.h)
+# Detecting C++ default compiler
+if (NOT UNIX)
+    message(FATAL_ERROR "Non Unix system not supported yet")
+endif()
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    message(STATUS "Default C++ compiler: GCC")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    message(STATUS "Default C++ compiler: LLVM Clang")
+else ()
+    message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER_ID} currently not supported by CMake build")
+endif()
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -g")
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O3")
 
+# Source files
+set(SOURCE_FILES
+        realignment.h  realignment.cpp
+        ksnp_reader.h  ksnp_reader.cpp
+        snp_dbg.h      snp_dbg.cpp
+        cut_bubble.h   cut_bubble.cpp
+        phased_block.h phased_block.cpp
+        time_stamp.h)
+
+# Dependencies
+add_executable(ksnp ${SOURCE_FILES} main.cpp)
 target_link_libraries(ksnp -lhts -lz)

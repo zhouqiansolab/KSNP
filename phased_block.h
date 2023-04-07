@@ -9,55 +9,40 @@
 #include <cstdint>
 #include <vector>
 
-#include "vcf_reader.h"
+#include "snp_dbg.h"
 
-struct SNP_Block {
-	int anchor;
-	int n, m;
-	uint8_t *bit;
+class PostProcess {
+private:
+	std::vector<SNP> &snp_column;
+	const std::vector<Read_Allele> &read_row;
+	std::vector<Phased_Block> &blocks;
+	std::vector<int8_t> &hint;
 
-	SNP_Block(int pos_0) {
-		anchor = pos_0;
-		n = 0;
-		m = 64;
-		bit = (uint8_t*) malloc(m * sizeof(uint8_t));
-	}
+	void de_overlap();
 
-	void add(uint8_t b) {
-		if (n >= m) {
-			m <<= 1;
-			bit = (uint8_t*) realloc(bit, m * sizeof(uint8_t));
-		}
-		bit[n++] = b;
-	}
+	/** Calculate MEC score for a seed template TENC on block [p, p+TLEN) */
+	int mec_of_template(Phased_Block &b, int p, int TLEN, uint tmp);
+	void error_correction();
+
+	/** Connect two neighbouring blocks in which way.
+	 * @return 0  Connect directly
+	 * @return 1  Connect with the second block reversed
+	 * @return -1 Do NOT connect them */
+	int8_t connect_block(const Phased_Block &prev, const Phased_Block &curr);
+	void merge();
+
+	bool try_to_switch(const Phased_Block &b, int p);
+	bool try_to_flip(const Phased_Block &b, int p);
+
+public:
+	PostProcess(std::vector<SNP> &snp, const std::vector<Read_Allele> &read,
+        std::vector<Phased_Block> &b, std::vector<int8_t> &h);
+
+	void resolve();
 };
 
-struct Phased_Result {
-	int n;
-	int *index; // The index of SNP in VCF file
-	uint8_t *bit;
-	int *head;
+void output_vcf_header(VCF_Header &header, const char *fn);
 
-	Phased_Result(int m) {
-		n = 0;
-		index = (int*) malloc(m * sizeof(int));
-		bit = (uint8_t*) malloc(m * sizeof(uint8_t));
-		head = (int*) malloc(m * sizeof(int));
-	}
-
-	void add(const SNP_Block &b);
-
-	void merge(const SNP_Block &b, bool reversed);
-
-	void write_vcf(const char *src, const char *dst);
-
-	void destroy() const {
-		free(index); free(bit); free(head);
-	}
-};
-
-std::vector<SNP_Block> remove_overlap(std::vector<SNP_Block> &blocks);
-
-Phased_Result merge_blocks(const std::vector<SNP_Block> &blocks, const std::vector<SNP> &ros);
+void output_haplotype_block(const std::vector<SNP> &vcf_snp, const char *dst_fn);
 
 #endif //KSNP_PHASED_BLOCK_H

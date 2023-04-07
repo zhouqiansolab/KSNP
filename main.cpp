@@ -1,79 +1,111 @@
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <algorithm>
-#include <sys/time.h>
 #include <getopt.h>
-#include <sys/resource.h>
+#include <cassert>
 
+#include "ksnp_reader.h"
 #include "snp_dbg.h"
+#include "phased_block.h"
+#include "time_stamp.h"
 
-std::string global_chrom; // The program only processes one chromosome each time
+#define VERSION  "1.3"
+#define DEV_MODE "RELEASE"
 
 static int usage() {
-	std::cerr << "Usage: ksnp -k <k-mer size> -b <in.bam> -v <VCF file> -o <output file>" << std::endl;
-	std::cerr << "    K-mer size supports INT value from 2 to 10 (default value is 2)" << std::endl;
-	std::cerr << "    Guarantee there is *one* chromosome in BAM file" << std::endl;
-	std::cerr << "    Without specifying the output file, the phased VCF is print to stdout by default" << std::endl;
+	fprintf(stderr, "Usage: ksnp -b <BAM> -r <FASTA> -v <VCF> -o <Output>\n");
+	fprintf(stderr, "  -b aligned reads in BAM format\n");
+	fprintf(stderr, "  -r reference sequence for allele realignment in FASTA format\n");
+	fprintf(stderr, "  -v heterozygous variants to phase in VCF format\n");
+	fprintf(stderr, "  -o output file that phased results are written to (stdout)\n");
+	fprintf(stderr, "  -k k-mer size to construct DBG, currently supporting 2,3,4,5 (2)\n");
+	fprintf(stderr, "Version: %s (%s)\n", VERSION, DEV_MODE);
 	return 1;
-}
-
-double realtime(){
-	struct timeval tp;
-	struct timezone tzp;
-	gettimeofday(&tp, &tzp);
-	return tp.tv_sec + tp.tv_usec * 1e-6;
-}
-
-double cputime() {
-	struct rusage r;
-	getrusage(RUSAGE_SELF, &r);
-	return r.ru_utime.tv_sec + r.ru_stime.tv_sec + 1e-6 * (r.ru_utime.tv_usec + r.ru_stime.tv_usec);
 }
 
 int main(int argc, char *argv[]) {
 	if (argc == 1) return usage();
-	double time_s = realtime();
-	int c, K = 2;
-	const char *bam_fn = nullptr, *vcf_fn = nullptr, *output_fn = nullptr;
-	while ((c = getopt(argc, argv, "k:b:v:o:")) >= 0) {
-		if (c == 'k') {
-			K = atoi(optarg);
-		} else if (c == 'b') {
+	TimeStamp stamp; stamp.push();
+
+	int c, K = 2; // default value K = 2
+	const char *bam_fn = nullptr, *vcf_fn = nullptr,  *ref_fn = nullptr, *output_fn = nullptr;
+	const char *request_chromosome = nullptr;
+	const char *resolution_fn = nullptr;
+	const char *og_prefix = nullptr;
+	while ((c = getopt(argc, argv, "b:v:o:c:k:r:l:R:")) >= 0) {
+		if (c == 'b') {
 			bam_fn = optarg;
 		} else if (c == 'v') {
 			vcf_fn = optarg;
 		} else if (c == 'o') {
 			output_fn = optarg;
+		} else if (c == 'c') {
+			request_chromosome = optarg;
+		} else if (c == 'k') {
+			K = atoi(optarg);
+		} else if (c == 'r') {
+			ref_fn = optarg;
+		}
+		// Development options
+		else if (c == 'l') {
+			og_prefix = optarg; // output graph of each step
+		} else if (c == 'R') {
+			resolution_fn = optarg; // input allele instead of BAM (for faster input)
 		} else return usage();
 	}
 
-	if (K < 2 || K > 10) return usage();
-	if (bam_fn == nullptr || vcf_fn == nullptr) return usage();
+	if (bam_fn == nullptr) { fprintf(stderr, "ERR: please assign a BAM file of aligned reads\n"); return 1; }
+	if (vcf_fn == nullptr) { fprintf(stderr, "ERR: please choose a VCF file to phase\n"); return 1; }
+	if (ref_fn == nullptr) {
+		fprintf(stderr, "ERR: please provide a reference sequence for detecting alleles by realignment\n" );
+		return 1;
+	}
+	if (K < 2 or K > 5) {
+		fprintf(stderr, "MSG: invalid K value is given. K is set to 2.\n");
+		K = 2;
+	}
 
-	auto snps = input_snp(vcf_fn);
-	std::sort(snps.begin(), snps.end());
-	std::cerr << "Input " << snps.size() << " SNPs" << std::endl;
+	// Input all variants to phase
+	stamp.push();
+	auto variant_table = input_vcf(vcf_fn, request_chromosome);
+	stamp.record("1 Input_VCF");
 
-	SNP_DBG dbg(K, snps.size());
-	dbg.construct_graph(bam_fn, snps);
-	dbg.trim_graph();
-	dbg.remove_tip();
-	dbg.remove_bubble();
-	dbg.remove_tip_again();
-	auto blocks = dbg.snp_haplotype();
-	dbg.destroy();
+	// Phase SNPs of each chromosome
+	FASTA_Reader ref_reader(ref_fn);
+	output_vcf_header(variant_table.header, output_fn);
+	for (int i = 0; i < variant_table.size; i++) {
+		const auto &chr_name = variant_table.chromosome[i];
+		auto &snp_column = variant_table.variants[i];
+		fprintf(stderr, "Phase %ld SNPs on chromosome %s\n", snp_column.size(), chr_name.c_str());
 
-	auto ro_blocks = remove_overlap(blocks);
-	auto results = merge_blocks(ro_blocks, snps);
-	results.write_vcf(vcf_fn, output_fn);
+		// Detecting alleles
+		stamp.push();
+		int length = ref_reader.get_length(chr_name); assert(length > 0);
+		char *sequence = ref_reader.get_contig(chr_name);
+		std::vector<Read_Allele> read_row;
+		if (!resolution_fn) read_row = detect_allele(bam_fn, chr_name, snp_column, length, sequence);
+		else read_row = input_allele(resolution_fn, snp_column);
+		delete [] sequence;
+		stamp.record("2 Detect_Allele");
 
-	// Free memory for blocks and resolution reads
-	for (auto &b : ro_blocks) free(b.bit); ro_blocks.clear();
-	for (auto &s : snps) s.destroy(); snps.clear();
-	results.destroy();
+		// DBG
+		stamp.push();
+		SNP_DBG dbg(K, snp_column, read_row);
+		if (og_prefix) dbg.output_graph_to(og_prefix);
+		dbg.resolve();
+		auto hint_post = dbg.get_hint_post();
+		auto blocks = dbg.haplotype_block();
+		dbg.destroy();
+		// Post Process
+		PostProcess post(snp_column, read_row, blocks, hint_post);
+		post.resolve();
+		stamp.record("3 DBG");
 
-	double time_e = realtime();
-	std::cerr << "In total, ksnp cost " << time_e-time_s << " real seconds, " << cputime() <<  " CPU seconds" << std::endl;
+		// Output phased result
+		stamp.push();
+		output_haplotype_block(snp_column, output_fn);
+		stamp.record("4 Output_VCF");
+	}
+	ref_reader.close();
+
+	stamp.record("5 Total");
+//	stamp.output();
 	return 0;
 }
