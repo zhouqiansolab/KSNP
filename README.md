@@ -28,7 +28,7 @@ ksnp -k <k-mer size> -b <BAM> -r <FASTA> -v <VCF> -o <output file>
   ## The output file keeps all varinats in input VCF file but with phased information. Without specifying it, the results will be print to stdout.
   ## Sample usage: ksnp -b aln.bam -r ref.fa -v variants.vcf -o phased.vcf
 ```
-## For test
+## For testing
 ```
 cd test
 ksnp -k 2 -b aln.bam -r ref.fa -v variants.vcf -o test_ksnp.vcf
