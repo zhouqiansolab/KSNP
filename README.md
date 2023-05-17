@@ -7,6 +7,7 @@
 - gcc >= 6.4
 - htslib 1.15.1
 
+KSNP can be complied on Linux or MAC OS.
 Before KSNP installation, keep sure the dependency htslib has been correctly installed.
 If it is not in default system path, please add its directory to environmental variable `LD_LIBRARY_PATH`.
 
@@ -27,7 +28,12 @@ ksnp -k <k-mer size> -b <BAM> -r <FASTA> -v <VCF> -o <output file>
   ## The output file keeps all varinats in input VCF file but with phased information. Without specifying it, the results will be print to stdout.
   ## Sample usage: ksnp -b aln.bam -r ref.fa -v variants.vcf -o phased.vcf
 ```
-
+## For test
+```
+cd test
+ksnp -k 2 -b aln.bam -r ref.fa -v variants.vcf -o test_ksnp.vcf
+  ##expect_output.vcf is an expected output file that can be used for comparing with the test results.
+```
 ## Contact
 ```
 zhouqian_solab@163.com
