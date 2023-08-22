@@ -16,7 +16,7 @@ or use the pre-compile option `-DHTSLIB=` when running `cmake` to specify the lo
 ```
 git clone https://github.com/zhouqiansolab/KSNP
 cd KSNP; mkdir build; cd build
-cmake ..; make
+cmake -DHSTLIB=<directory of libhts.so> ..; make
 ```
 If the installation is successful, the build subdirectory will contain the executable file `ksnp`.
 
@@ -26,6 +26,7 @@ ksnp -k <k-mer size> -b <BAM> -r <FASTA> -v <VCF> -o <output file>
   ## The k-mer size supports INT value from 2 to 5. Default value is set to 2.
   ## BAM file contains the aligned reads. It must be sorted and indexed.
   ## FASTA file is the reference sequence used for reads alignment and variants calling. It should be indexed by 'samtools faidx'
+  ## Users may specify a chromosome using option -c <chr-name> to manually parallize KSNP across chromosomes.
   ## VCF file contains the heterozygous variants to phase. It should be properly filtered before phasing.
   ## The output file keeps all varinats in input VCF file but with phased information. Without specifying it, the results will be print to stdout.
   ## Sample usage: ksnp -b aln.bam -r ref.fa -v variants.vcf -o phased.vcf

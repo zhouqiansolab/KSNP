@@ -6,17 +6,17 @@
 #include "phased_block.h"
 #include "time_stamp.h"
 
-#define VERSION  "1.3"
-#define DEV_MODE "RELEASE"
+#define VERSION  "1.0.3"
 
 static int usage() {
 	fprintf(stderr, "Usage: ksnp -b <BAM> -r <FASTA> -v <VCF> -o <Output>\n");
-	fprintf(stderr, "  -b aligned reads in BAM format\n");
-	fprintf(stderr, "  -r reference sequence for allele realignment in FASTA format\n");
+	fprintf(stderr, "  -b aligned reads in BAM format (indexed required)\n");
+	fprintf(stderr, "  -r reference sequence for allele realignment in FASTA format (indexed required)\n");
 	fprintf(stderr, "  -v heterozygous variants to phase in VCF format\n");
 	fprintf(stderr, "  -o output file that phased results are written to (stdout)\n");
 	fprintf(stderr, "  -k k-mer size to construct DBG, currently supporting 2,3,4,5 (2)\n");
-	fprintf(stderr, "Version: %s (%s)\n", VERSION, DEV_MODE);
+	fprintf(stderr, "  -c specify a chromosome to phase\n");
+	fprintf(stderr, "Version: %s\n", VERSION);
 	return 1;
 }
 
