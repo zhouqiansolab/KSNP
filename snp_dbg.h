@@ -7,7 +7,7 @@
 
 #include <vector>
 #include <set>
-#include <stdint.h>
+#include <cstdint>
 #include "ksnp_reader.h"
 #include "cut_bubble.h"
 
