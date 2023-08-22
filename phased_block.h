@@ -46,3 +46,4 @@ void output_vcf_header(VCF_Header &header, const char *fn);
 void output_haplotype_block(const std::vector<SNP> &vcf_snp, const char *dst_fn);
 
 #endif //KSNP_PHASED_BLOCK_H
+

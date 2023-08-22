@@ -668,3 +668,4 @@ typedef const char *kh_cstr_t;
 	KHASH_INIT(name, kstring_t, khval_t, 1, kh_kstr_hash_func, kh_kstr_hash_equal)
 
 #endif /* __AC_KHASH_H */
+

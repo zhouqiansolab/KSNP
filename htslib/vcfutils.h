@@ -141,3 +141,4 @@ static inline int bcf_acgt2int(char c)
 #endif
 
 #endif
+

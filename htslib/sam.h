@@ -2281,3 +2281,4 @@ int bam_mods_at_qpos(const bam1_t *b, int qpos, hts_base_mod_state *state,
 #endif
 
 #endif
+

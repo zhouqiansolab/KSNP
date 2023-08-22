@@ -68,3 +68,4 @@ std::pair<int, int> edit_distance(const uint8_t *que, int que_pos, int q_len,
 								  const char *ref, int ref_pos, int r_len, char alt_allele);
 
 #endif //KSNP_REALIGNMENT_H
+

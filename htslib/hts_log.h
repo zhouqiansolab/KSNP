@@ -94,3 +94,4 @@ HTS_FORMAT(HTS_PRINTF_FMT, 3, 4);
 #endif
 
 #endif // #ifndef HTS_LOG_H
+

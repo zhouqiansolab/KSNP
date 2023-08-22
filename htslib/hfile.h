@@ -381,3 +381,4 @@ int hfile_has_plugin(const char *name);
 #endif
 
 #endif
+

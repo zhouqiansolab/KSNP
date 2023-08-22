@@ -352,3 +352,4 @@ static inline void double_to_le(double val, uint8_t *buf) {
 }
 
 #endif /* HTS_ENDIAN_H */
+

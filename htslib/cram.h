@@ -569,3 +569,4 @@ refs_t *cram_get_refs(htsFile *fd);
 #endif
 
 #endif
+

@@ -195,3 +195,4 @@ std::vector<Read_Allele> detect_allele(const char *bam_fn, const std::string &ch
 std::vector<Read_Allele> input_allele(const char *fn, std::vector<SNP> &snps);
 
 #endif //KSNP_DEV_KSNP_READER_H
+

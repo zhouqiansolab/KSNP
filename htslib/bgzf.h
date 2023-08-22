@@ -463,3 +463,4 @@ typedef struct BGZF BGZF;
 #endif
 
 #endif
+

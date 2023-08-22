@@ -1514,3 +1514,4 @@ static inline int32_t bcf_dec_size(const uint8_t *p, uint8_t **q, int *type)
 #endif
 
 #endif
+

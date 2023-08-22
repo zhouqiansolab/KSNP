@@ -247,3 +247,4 @@
 	int kseq_read(kseq_t *seq);
 
 #endif
+

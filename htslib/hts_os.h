@@ -84,3 +84,4 @@ extern int is_cygpty(int fd);
 #endif
 
 #endif // HTSLIB_HTS_OS_H
+
