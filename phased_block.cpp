@@ -15,8 +15,8 @@
 
 PostProcess::PostProcess(std::vector<SNP> &snp, const std::vector<Read_Allele> &read,
                          std::vector<Phased_Block> &b, std::vector<int8_t> &h) :
-                         snp_column(snp), read_row(read),
-                         blocks(b), hint(h) {
+		snp_column(snp), read_row(read),
+		blocks(b), hint(h) {
 	fprintf(stderr, "Post-process haplotype blocks from DBG\n");
 }
 
@@ -318,8 +318,8 @@ int8_t PostProcess::connect_block(const Phased_Block &prev, const Phased_Block &
 	}
 	if (!active) return BROKE;
 	if (kept_mec > reverse_mec) return REVERSE;
-	if (kept_mec < reverse_mec) return KEPT;
-	if (kept_mec == reverse_mec) return BROKE; // An conservative strategy
+	else if (kept_mec < reverse_mec) return KEPT;
+	else return BROKE; // An conservative strategy
 }
 
 void PostProcess::merge() {

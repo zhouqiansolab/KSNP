@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <set>
+#include <stdint.h>
 #include "ksnp_reader.h"
 #include "cut_bubble.h"
 
@@ -45,7 +46,7 @@ private:
 	int *edge_cnt; /** The number of reads supporting an edge. */
 	int *weight; /** The assigned weight of an edge; The three arrays above are accessed
                    * by an index of shift times and an encoded word. */
-    std::vector<int8_t> hint_post; /** Hint for post-processing (Caller is the placeholder).
+	std::vector<int8_t> hint_post; /** Hint for post-processing (Caller is the placeholder).
                                     * 0: Phase of high confidence.
                                     * 1: Phase of low quality.
                                     * 3: SNPs from tangle bubbles. */
@@ -147,7 +148,7 @@ private:
 
 	/** Display reads on bubble area */
 	void display_reads(int l, int64_t back, int32_t s, int blen,
-					const std::vector<Bubble_Path> &paths, const std::vector<int> &read_set);
+	                   const std::vector<Bubble_Path> &paths, const std::vector<int> &read_set);
 
 	/** Calculate MEC score for a path in bubble area. */
 	int mec_bubble_path(const std::vector<int> &read_set, int base, const std::vector<int8_t> &path);
@@ -210,4 +211,3 @@ public:
 };
 
 #endif //KSNP_SNP_DBG_H
-

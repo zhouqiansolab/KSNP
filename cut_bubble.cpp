@@ -428,4 +428,5 @@ double CUT_Bubble::max_likelihood_cut(const char *hap) {
 		} else iter_since_improved++;
 		if (iter_since_improved > CUT_CONVERGE) break;
 	}
+	return 0;
 }
