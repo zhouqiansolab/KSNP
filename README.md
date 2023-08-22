@@ -22,7 +22,7 @@ If the installation is successful, the build subdirectory will contain the execu
 
 ## Usage
 ```
-ksnp -k <k-mer size> -b <BAM> -r <FASTA> -v <VCF> -o <output file>
+ksnp -k <k-mer size> -b <BAM> -r <FASTA> -v <VCF> -o <output file>  [-c chr]
   ## The k-mer size supports INT value from 2 to 5. Default value is set to 2.
   ## BAM file contains the aligned reads. It must be sorted and indexed.
   ## FASTA file is the reference sequence used for reads alignment and variants calling. It should be indexed by 'samtools faidx'
@@ -30,6 +30,7 @@ ksnp -k <k-mer size> -b <BAM> -r <FASTA> -v <VCF> -o <output file>
   ## VCF file contains the heterozygous variants to phase. It should be properly filtered before phasing.
   ## The output file keeps all varinats in input VCF file but with phased information. Without specifying it, the results will be print to stdout.
   ## Sample usage: ksnp -b aln.bam -r ref.fa -v variants.vcf -o phased.vcf
+  ## -c allows users to specify individual chromosomes for phasing, enabling chromosome-level parallel processing without the need for splitting input files.
 ```
 ## For testing
 ```
