@@ -2,21 +2,37 @@
 
 ## Download and install
 
-**Dependencies**
+### Dependencies
 - cmake >= 3.10
 - gcc >= 6.4
-- htslib 1.15.1
+- htslib >= 1.15
+- zlib >= 1.2
 
-KSNP can be complied on Linux or MAC OS.
-Before KSNP installation, keep sure the dependency htslib has been correctly installed.
+KSNP can be installed on Linux or MAC OS.
+
+### Install from conda
+
+We recommend users install KSNP using conda command.
+
+```
+# New environment is not necessary but for avoiding environmental conflicts.
+conda create -n knsp_env
+# We are working on the request for the KSNP release on bioconda community. For now KSNP is in our temporary channel.
+conda install -c conda-forge -c bioconda -c i-xiaohu ksnp
+```
+
+### Install from source
+
+Before compile the KSNP code locally, keep sure the dependency htslib has been correctly installed.
 Please add the subdirectory containing `libhts.so` to the default environmental variable for
 searching dynamic-link libraries (such as `LD_LIBRARY_PATH` environment variable in Linux OS) 
 or use the pre-compile option `-DHTSLIB=` when running `cmake` to specify the location.
 
 ```
-git clone https://github.com/zhouqiansolab/KSNP
+git clone https://github.com/zhouqiansolab/KSNP.git
 cd KSNP; mkdir build; cd build
-cmake -DHSTLIB=<directory of libhts.so> ..; make
+cmake -DHSTLIB=<directory of libhts.so> ..
+make
 ```
 If the installation is successful, the build subdirectory will contain the executable file `ksnp`.
 
