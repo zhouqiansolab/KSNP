@@ -15,10 +15,9 @@ KSNP can be installed on Linux or MAC OS.
 We recommend users install KSNP using conda command.
 
 ```
-# New environment is not necessary but for avoiding environmental conflicts.
-conda create -n knsp_env
-# We are working on the request for the KSNP release on bioconda community. For now KSNP is in our temporary channel.
-conda install -c conda-forge -c bioconda -c i-xiaohu ksnp
+# New environment is recommended for avoiding dependency conflicts.
+conda create -n ksnp_env
+conda install -c conda-forge -c bioconda ksnp
 ```
 
 ### Install from source
